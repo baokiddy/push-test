@@ -1,4 +1,4 @@
-name: Scan for 404 Errors
+name: Scan Markdown Files for 404 Errors
 
 on:
   schedule:
@@ -18,24 +18,7 @@ jobs:
       - name: Install Dependencies
         run: sudo apt-get update && sudo apt-get install -y curl grep sed
 
-      # Step 3: Scan the website for broken links (404 errors)
-      - name: Scan Website for 404 Errors
-        if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule }}
-        run: |
-          echo "Scanning website for 404 errors..."
-          urls=(
-            "https://<username>.github.io/" # Replace with your GitHub Pages URL
-            "https://<username>.github.io/some-page"
-          )
-          echo "Checking URLs..." > website-404-errors.log
-          for url in "${urls[@]}"; do
-            status_code=$(curl -o /dev/null -s -w "%{http_code}" "$url")
-            if [ "$status_code" -eq 404 ]; then
-              echo "404 Error: $url" >> website-404-errors.log
-            fi
-          done
-
-      # Step 4: Scan .md files in the repository for broken links
+      # Step 3: Scan Markdown files for broken links
       - name: Scan Markdown Files for Broken Links
         run: |
           echo "Scanning Markdown files for broken links..."
@@ -44,18 +27,18 @@ jobs:
             grep -oP '(?<=\]\().*?(?=\))' "$file" | while read -r link; do
               if [[ $link == http* ]]; then
                 status_code=$(curl -o /dev/null -s -w "%{http_code}" "$link")
-                if [ "$status_code" -eq 404 ]; then
+                if [ "$status_code" == "000" ]; then
+                  echo "Malformed URL or network issue in $file: $link" >> markdown-404-errors.log
+                elif [ "$status_code" -eq 404 ]; then
                   echo "404 Error in $file: $link" >> markdown-404-errors.log
                 fi
               fi
-            done
+            done || true
           done
 
-      # Step 5: Upload the log files as artifacts
-      - name: Upload Log Files
+      # Step 4: Upload the log file as an artifact
+      - name: Upload Log File
         uses: actions/upload-artifact@v4
         with:
-          name: 404-errors-logs
-          path: |
-            website-404-errors.log
-            markdown-404-errors.log
+          name: markdown-404-errors
+          path: markdown-404-errors.log
