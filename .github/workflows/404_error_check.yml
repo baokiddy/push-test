@@ -48,21 +48,24 @@ jobs:
                 echo "Checking Markdown URL: $url"
                 if [[ "$url" == *"github.com"* ]]; then
                   # Convert GitHub URL to raw content URL
-                  raw_url=$(echo "$url" | sed 's/github\.com\/\([^/]*\)\/\([^/]*\)\/blob\/\([^/]*\)\(.*\)/raw\.githubusercontent\.com\/\1\/\2\/\3\4/')
-                  
+                  raw_url=$(echo "$url" | sed 's/github\.com\/\([^/]*\)\/\([^/]*\)\/edit\/.*\/\(.*\)/raw\.githubusercontent\.com\/\1\/\2\/main\/\2/')
+
+                  # Debugging: Echo the raw URL to check if it's correct
+                  echo "Raw URL: $raw_url"
+
                   # Check if raw_url is empty, if so, use the original url
                   if [[ -z "$raw_url" ]]; then
                     raw_url="$url"
                   fi
 
-                  status_code=$(curl -o /dev/null -s -w "%{http_code}" "$raw_url")
+                  status_code=$(curl -o /dev/null -s -w "%{http_code}" "$raw_url" || true)
                   if [ "$status_code" == "404" ]; then
                     echo "404 Error (GitHub raw content) in $file: $url" >> md-404-errors.log
                   else
                     echo "Valid GitHub raw content: $raw_url"
                   fi
                 else
-                  status_code=$(curl -o /dev/null -s -w "%{http_code}" "$url")
+                  status_code=$(curl -o /dev/null -s -w "%{http_code}" "$url" || true)
                   if [ "$status_code" == "404" ]; then
                     echo "404 Error (Markdown link) in $file: $url" >> md-404-errors.log
                   fi
@@ -77,21 +80,24 @@ jobs:
               echo "Checking Plain URL: $url"
               if [[ "$url" == *"github.com"* ]]; then
                 # Convert GitHub URL to raw content URL
-                raw_url=$(echo "$url" | sed 's/github\.com\/\([^/]*\)\/\([^/]*\)\/blob\/\([^/]*\)\(.*\)/raw\.githubusercontent\.com\/\1\/\2\/\3\4/')
-                
+                raw_url=$(echo "$url" | sed 's/github\.com\/\([^/]*\)\/\([^/]*\)\/edit\/.*\/\(.*\)/raw\.githubusercontent\.com\/\1\/\2\/main\/\2/')
+
+                # Debugging: Echo the raw URL to check if it's correct
+                echo "Raw URL: $raw_url"
+
                 # Check if raw_url is empty, if so, use the original url
                 if [[ -z "$raw_url" ]]; then
                   raw_url="$url"
                 fi
 
-                status_code=$(curl -o /dev/null -s -w "%{http_code}" "$raw_url")
+                status_code=$(curl -o /dev/null -s -w "%{http_code}" "$raw_url" || true)
                 if [ "$status_code" == "404" ]; then
                   echo "404 Error (GitHub raw content) in $file: $url" >> md-404-errors.log
                 else
                   echo "Valid GitHub raw content: $raw_url"
                 fi
               else
-                status_code=$(curl -o /dev/null -s -w "%{http_code}" "$url")
+                status_code=$(curl -o /dev/null -s -w "%{http_code}" "$url" || true)
                 if [ "$status_code" == "404" ]; then
                   echo "404 Error (Plain URL) in $file: $url" >> md-404-errors.log
                 fi
