@@ -18,7 +18,7 @@ jobs:
       - name: Install Dependencies
         run: sudo apt-get update && sudo apt-get install -y curl grep sed
 
-      # Step 3: Debugging step to list all .md files and extracted links
+      # Step 3: Debugging step to list all .md files
       - name: Debug Markdown Files
         run: |
           echo "Markdown files found:"
@@ -42,38 +42,48 @@ jobs:
             echo "Processing $file..."
 
             # Check Markdown-style links
-            markdown_links=$(grep -oP '\[([^\]]+)\]\(([^)]+)\)' "$file")
-            if [ -n "$markdown_links" ]; then
-              echo "Markdown links found in $file:"
-              echo "$markdown_links"
-              while read link; do
-                url=$(echo "$link" | grep -oP '\(([^)]+)\)' | tr -d '()')
-                status_code=$(curl -o /dev/null -s -w "%{http_code}" "$url")
-                if [ "$status_code" == "404" ]; then
-                  echo "404 Error (Markdown link) in $file: $url" >> md-404-errors.log
+            while IFS= read -r link; do
+              url=$(echo "$link" | grep -oP '\(([^)]+)\)' | tr -d '()')
+              if [[ -n "$url" ]]; then
+                echo "Checking Markdown URL: $url"
+                if [[ "$url" == *"github.com"* ]]; then
+                  # Validate GitHub public repository links
+                  status_code=$(curl -o /dev/null -s -w "%{http_code}" "$url")
+                  if [ "$status_code" == "404" ]; then
+                    echo "404 Error (GitHub public repo link) in $file: $url" >> md-404-errors.log
+                  else
+                    echo "Valid GitHub public repo link: $url"
+                  fi
+                else
+                  # Validate other URLs
+                  status_code=$(curl -o /dev/null -s -w "%{http_code}" "$url")
+                  if [ "$status_code" == "404" ]; then
+                    echo "404 Error (Markdown link) in $file: $url" >> md-404-errors.log
+                  fi
                 fi
-              done <<< "$markdown_links"
-            else
-              echo "No Markdown links found in $file."
-            fi
+              else
+                echo "No URL found in Markdown link: $link"
+              fi
+            done < <(grep -oP '\[([^\]]+)\]\(([^)]+)\)' "$file")
 
             # Check plain URLs
-            plain_urls=$(grep -oP 'http[s]?://[^\s)]+|www\.[^\s)]+|ftp://[^\s)]+|file://[^\s)]+' "$file")
-            if [ -n "$plain_urls" ]; then
-              echo "Plain URLs found in $file:"
-              echo "$plain_urls"
-              while read url; do
-                if [[ $url != www.* ]]; then
-                  url="http://$url"
+            while IFS= read -r url; do
+              if [[ "$url" == *"github.com"* ]]; then
+                # Validate GitHub public repository links
+                status_code=$(curl -o /dev/null -s -w "%{http_code}" "$url")
+                if [ "$status_code" == "404" ]; then
+                  echo "404 Error (GitHub public repo link) in $file: $url" >> md-404-errors.log
+                else
+                  echo "Valid GitHub public repo link: $url"
                 fi
+              else
+                # Validate other URLs
                 status_code=$(curl -o /dev/null -s -w "%{http_code}" "$url")
                 if [ "$status_code" == "404" ]; then
                   echo "404 Error (Plain URL) in $file: $url" >> md-404-errors.log
                 fi
-              done <<< "$plain_urls"
-            else
-              echo "No plain URLs found in $file."
-            fi
+              fi
+            done < <(grep -oP 'http[s]?://[^\s)]+|www\.[^\s)]+|ftp://[^\s)]+|file://[^\s)]+' "$file")
           done
 
           if [ ! -s md-404-errors.log ]; then
