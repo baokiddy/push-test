@@ -24,6 +24,9 @@ jobs:
           echo "Markdown files found:"
           find . -name "*.md" || echo "No Markdown files found."
 
+          echo "Contents of Markdown files:"
+          find . -name "*.md" -exec cat {} \; || echo "No Markdown files found."
+
           echo "Extracted Markdown Links:"
           find . -name "*.md" -exec grep -oP '\[([^\]]+)\]\(([^)]+)\)' {} \; || echo "No Markdown links found."
 
@@ -39,24 +42,38 @@ jobs:
             echo "Processing $file..."
 
             # Check Markdown-style links
-            grep -oP '\[([^\]]+)\]\(([^)]+)\)' "$file" | while read link; do
-              url=$(echo "$link" | grep -oP '\(([^)]+)\)' | tr -d '()')
-              status_code=$(curl -o /dev/null -s -w "%{http_code}" "$url")
-              if [ "$status_code" == "404" ]; then
-                echo "404 Error (Markdown link) in $file: $url" >> md-404-errors.log
-              fi
-            done || true
+            markdown_links=$(grep -oP '\[([^\]]+)\]\(([^)]+)\)' "$file")
+            if [ -n "$markdown_links" ]; then
+              echo "Markdown links found in $file:"
+              echo "$markdown_links"
+              while read link; do
+                url=$(echo "$link" | grep -oP '\(([^)]+)\)' | tr -d '()')
+                status_code=$(curl -o /dev/null -s -w "%{http_code}" "$url")
+                if [ "$status_code" == "404" ]; then
+                  echo "404 Error (Markdown link) in $file: $url" >> md-404-errors.log
+                fi
+              done <<< "$markdown_links"
+            else
+              echo "No Markdown links found in $file."
+            fi
 
             # Check plain URLs
-            grep -oP 'http[s]?://[^\s)]+|www\.[^\s)]+|ftp://[^\s)]+|file://[^\s)]+' "$file" | while read url; do
-              if [[ $url != www.* ]]; then
-                url="http://$url"
-              fi
-              status_code=$(curl -o /dev/null -s -w "%{http_code}" "$url")
-              if [ "$status_code" == "404" ]; then
-                echo "404 Error (Plain URL) in $file: $url" >> md-404-errors.log
-              fi
-            done || true
+            plain_urls=$(grep -oP 'http[s]?://[^\s)]+|www\.[^\s)]+|ftp://[^\s)]+|file://[^\s)]+' "$file")
+            if [ -n "$plain_urls" ]; then
+              echo "Plain URLs found in $file:"
+              echo "$plain_urls"
+              while read url; do
+                if [[ $url != www.* ]]; then
+                  url="http://$url"
+                fi
+                status_code=$(curl -o /dev/null -s -w "%{http_code}" "$url")
+                if [ "$status_code" == "404" ]; then
+                  echo "404 Error (Plain URL) in $file: $url" >> md-404-errors.log
+                fi
+              done <<< "$plain_urls"
+            else
+              echo "No plain URLs found in $file."
+            fi
           done
 
           if [ ! -s md-404-errors.log ]; then
