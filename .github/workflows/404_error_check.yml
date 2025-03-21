@@ -1,0 +1,62 @@
+name: Scan for 404 Errors
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Runs daily (adjust as needed)
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  scan-404-errors:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the repository
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      # Step 2: Install necessary tools
+      - name: Install Dependencies
+        run: sudo apt-get update && sudo apt-get install -y curl grep sed
+
+      # Step 3: Scan the website for broken links (404 errors)
+      - name: Scan Website for 404 Errors
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule }}
+        run: |
+          echo "Scanning website for 404 errors..."
+          urls=(
+            "https://<username>.github.io/" # Replace with your GitHub Pages URL
+            "https://<username>.github.io/some-page"
+          )
+          echo "Checking URLs..." > website-404-errors.log
+          for url in "${urls[@]}"; do
+            status_code=$(curl -o /dev/null -s -w "%{http_code}" "$url")
+            if [ "$status_code" -eq 404 ]; then
+              echo "404 Error: $url" >> website-404-errors.log
+            fi
+          done
+
+      # Step 4: Scan .md files in the repository for broken links
+      - name: Scan Markdown Files for Broken Links
+        run: |
+          echo "Scanning Markdown files for broken links..."
+          find . -name "*.md" | while read -r file; do
+            echo "Processing $file..."
+            grep -oP '(?<=\]\().*?(?=\))' "$file" | while read -r link; do
+              if [[ $link == http* ]]; then
+                status_code=$(curl -o /dev/null -s -w "%{http_code}" "$link")
+                if [ "$status_code" -eq 404 ]; then
+                  echo "404 Error in $file: $link" >> markdown-404-errors.log
+                fi
+              fi
+            done
+          done
+
+      # Step 5: Upload the log files as artifacts
+      - name: Upload Log Files
+        uses: actions/upload-artifact@v3
+        with:
+          name: 404-errors-logs
+          path: |
+            website-404-errors.log
+            markdown-404-errors.log
+
