@@ -22,6 +22,7 @@ jobs:
       - name: Scan Markdown Files for Broken Links
         run: |
           echo "Scanning Markdown files for broken links..."
+          touch markdown-404-errors.log # Ensure log file is created
           find . -name "*.md" | while read -r file; do
             echo "Processing $file..."
             grep -oP '(?<=\]\().*?(?=\))' "$file" | while read -r link; do
@@ -29,12 +30,17 @@ jobs:
                 status_code=$(curl -o /dev/null -s -w "%{http_code}" "$link")
                 if [ "$status_code" == "000" ]; then
                   echo "Malformed URL or network issue in $file: $link" >> markdown-404-errors.log
-                elif [ "$status_code" -eq 404 ]; then
+                elif [ "$status_code" == "404" ]; then
                   echo "404 Error in $file: $link" >> markdown-404-errors.log
                 fi
               fi
             done || true
           done
+
+          # Debugging step to check if log file is empty
+          if [ ! -s markdown-404-errors.log ]; then
+            echo "No 404 errors found or no links processed." >> markdown-404-errors.log
+          fi
 
       # Step 4: Upload the log file as an artifact
       - name: Upload Log File
