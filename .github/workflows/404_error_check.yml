@@ -47,15 +47,21 @@ jobs:
               if [[ -n "$url" ]]; then
                 echo "Checking Markdown URL: $url"
                 if [[ "$url" == *"github.com"* ]]; then
-                  # Validate GitHub public repository links
-                  status_code=$(curl -o /dev/null -s -w "%{http_code}" "$url")
+                  # Convert GitHub URL to raw content URL
+                  raw_url=$(echo "$url" | sed 's/github\.com\/\([^/]*\)\/\([^/]*\)\/blob\/\([^/]*\)\(.*\)/raw\.githubusercontent\.com\/\1\/\2\/\3\4/')
+                  
+                  # Check if raw_url is empty, if so, use the original url
+                  if [[ -z "$raw_url" ]]; then
+                    raw_url="$url"
+                  fi
+
+                  status_code=$(curl -o /dev/null -s -w "%{http_code}" "$raw_url")
                   if [ "$status_code" == "404" ]; then
-                    echo "404 Error (GitHub public repo link) in $file: $url" >> md-404-errors.log
+                    echo "404 Error (GitHub raw content) in $file: $url" >> md-404-errors.log
                   else
-                    echo "Valid GitHub public repo link: $url"
+                    echo "Valid GitHub raw content: $raw_url"
                   fi
                 else
-                  # Validate other URLs
                   status_code=$(curl -o /dev/null -s -w "%{http_code}" "$url")
                   if [ "$status_code" == "404" ]; then
                     echo "404 Error (Markdown link) in $file: $url" >> md-404-errors.log
@@ -68,16 +74,23 @@ jobs:
 
             # Check plain URLs
             while IFS= read -r url; do
+              echo "Checking Plain URL: $url"
               if [[ "$url" == *"github.com"* ]]; then
-                # Validate GitHub public repository links
-                status_code=$(curl -o /dev/null -s -w "%{http_code}" "$url")
+                # Convert GitHub URL to raw content URL
+                raw_url=$(echo "$url" | sed 's/github\.com\/\([^/]*\)\/\([^/]*\)\/blob\/\([^/]*\)\(.*\)/raw\.githubusercontent\.com\/\1\/\2\/\3\4/')
+                
+                # Check if raw_url is empty, if so, use the original url
+                if [[ -z "$raw_url" ]]; then
+                  raw_url="$url"
+                fi
+
+                status_code=$(curl -o /dev/null -s -w "%{http_code}" "$raw_url")
                 if [ "$status_code" == "404" ]; then
-                  echo "404 Error (GitHub public repo link) in $file: $url" >> md-404-errors.log
+                  echo "404 Error (GitHub raw content) in $file: $url" >> md-404-errors.log
                 else
-                  echo "Valid GitHub public repo link: $url"
+                  echo "Valid GitHub raw content: $raw_url"
                 fi
               else
-                # Validate other URLs
                 status_code=$(curl -o /dev/null -s -w "%{http_code}" "$url")
                 if [ "$status_code" == "404" ]; then
                   echo "404 Error (Plain URL) in $file: $url" >> md-404-errors.log
